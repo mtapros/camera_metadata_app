@@ -54,4 +54,90 @@ jobs:
 
       - name: Download Android SDK cmdline-tools
         run: |
-          mkdir -p "$HOME/.build
+          mkdir -p "$HOME/.buildozer/android/platform/android-sdk/cmdline-tools"
+          if [ ! -d "$HOME/.buildozer/android/platform/android-sdk/cmdline-tools/latest" ]; then
+            cd "$HOME/.buildozer/android/platform/android-sdk/cmdline-tools"
+            wget -q https://dl.google.com/android/repository/commandlinetools-linux-9477386_latest.zip
+            unzip -q commandlinetools-linux-9477386_latest.zip
+            mv cmdline-tools latest
+            rm commandlinetools-linux-9477386_latest.zip
+          fi
+
+      - name: Create legacy tools directory for Buildozer compatibility
+        run: |
+          mkdir -p "$HOME/.buildozer/android/platform/android-sdk/tools/bin"
+          ln -sf "$HOME/.buildozer/android/platform/android-sdk/cmdline-tools/latest/bin/sdkmanager" "$HOME/.buildozer/android/platform/android-sdk/tools/bin/sdkmanager"
+          ln -sf "$HOME/.buildozer/android/platform/android-sdk/cmdline-tools/latest/bin/avdmanager" "$HOME/.buildozer/android/platform/android-sdk/tools/bin/avdmanager"
+
+      - name: Accept all Android SDK licenses
+        run: |
+          export ANDROID_HOME="$HOME/.buildozer/android/platform/android-sdk"
+          mkdir -p "$ANDROID_HOME/licenses"
+          echo "24333f8a63b6825ea9c5514f83c2829b004d1fee" > "$ANDROID_HOME/licenses/android-sdk-license"
+          echo "d56f5187479451eabf01fb78af6dfcb131a6481e" >> "$ANDROID_HOME/licenses/android-sdk-license"
+          echo "e9acab5b5fbb560a72cfaecce8946896ff6aab9d" > "$ANDROID_HOME/licenses/android-sdk-preview-license"
+          echo "84831b9409646a918e30573bab4c9c91346d8abd" > "$ANDROID_HOME/licenses/android-googletv-license"
+          echo "d975f751698a77b662f1254ddbeed3901e976f5a" > "$ANDROID_HOME/licenses/intel-android-extra-license"
+          yes | "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" --licenses || true
+
+      - name: Install Android SDK components
+        run: |
+          export ANDROID_HOME="$HOME/.buildozer/android/platform/android-sdk"
+          "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" --sdk_root="$ANDROID_HOME" \
+            "platform-tools" \
+            "platforms;android-31" \
+            "build-tools;34.0.0" \
+            "ndk;25.2.9519653"
+
+      - name: Download latest apktool
+        run: |
+          wget -q https://raw.githubusercontent.com/iBotPeaches/Apktool/master/scripts/linux/apktool -O apktool
+          wget -q https://bitbucket.org/iBotPeaches/apktool/downloads/apktool_2.9.3.jar -O apktool.jar
+          chmod +x apktool
+          sudo mv apktool /usr/local/bin/
+          sudo mv apktool.jar /usr/local/bin/
+
+      - name: Build APK
+        run: |
+          . .venv/bin/activate
+          buildozer -v android debug
+
+      - name: Patch APK to add INTERNET permission
+        run: |
+          cd bin
+          APK_FILE=$(ls camerametadataapp-*-debug.apk)
+          echo "Patching $APK_FILE"
+          
+          apktool d "$APK_FILE" -o patched -f
+          
+          echo "=== Original manifest permissions ==="
+          cat patched/AndroidManifest.xml | grep -A3 "uses-permission" || echo "No permissions found"
+          
+          # Use sed to add permissions after manifest tag
+          sed -i '/<manifest/a\    <uses-permission android:name="android.permission.INTERNET"/>' patched/AndroidManifest.xml
+          sed -i '/<manifest/a\    <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE"/>' patched/AndroidManifest.xml
+          sed -i '/<manifest/a\    <uses-permission android:name="android.permission.ACCESS_WIFI_STATE"/>' patched/AndroidManifest.xml
+          sed -i '/<manifest/a\    <uses-permission android:name="android.permission.CHANGE_WIFI_STATE"/>' patched/AndroidManifest.xml
+          
+          echo "=== Patched manifest permissions ==="
+          cat patched/AndroidManifest.xml | grep -A3 "uses-permission"
+          
+          apktool b patched -o camerametadataapp-patched.apk
+          
+          if [ ! -f ~/.android/debug.keystore ]; then
+            mkdir -p ~/.android
+            keytool -genkey -v -keystore ~/.android/debug.keystore -storepass android -alias androiddebugkey -keypass android -keyalg RSA -keysize 2048 -validity 10000 -dname "CN=Android Debug,O=Android,C=US"
+          fi
+          
+          jarsigner -verbose -sigalg SHA256withRSA -digestalg SHA256 -keystore ~/.android/debug.keystore -storepass android camerametadataapp-patched.apk androiddebugkey
+          
+          zipalign -v 4 camerametadataapp-patched.apk camerametadataapp-final.apk
+          
+          echo "=== Patched APK created ==="
+          ls -lh camerametadataapp-final.apk
+
+      - name: Upload Patched APK artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: camerametadataapp-apk-patched
+          path: bin/camerametadataapp-final.apk
