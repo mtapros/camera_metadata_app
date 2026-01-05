@@ -7,13 +7,14 @@ from kivy.uix.label import Label
 from kivy.uix.textinput import TextInput
 from kivy.uix.button import Button
 from kivy.uix.popup import Popup
+from kivy.uix.scrollview import ScrollView
 from kivy.utils import platform
 import requests
 from requests.adapters import HTTPAdapter
-from requests.packages.urllib3.util.retry import Retry
 import urllib3
 import ssl
 import os
+from datetime import datetime
 
 urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 
@@ -41,22 +42,114 @@ class CameraMetadataApp(App):
         # Create a session with custom SSL adapter
         self.session = requests.Session()
         self.session.mount('https://', SSLAdapter())
+        self.debug_messages = []
+        
+    def log(self, message):
+        """Add timestamped log message"""
+        timestamp = datetime.now().strftime("%H:%M:%S")
+        log_msg = f"[{timestamp}] {message}"
+        self.debug_messages.append(log_msg)
+        
+        # Keep only last 50 messages
+        if len(self.debug_messages) > 50:
+            self.debug_messages.pop(0)
+        
+        # Update debug label if it exists
+        if hasattr(self, 'debug_label'):
+            self.debug_label.text = '\n'.join(self.debug_messages)
+        
+        # Also print to console/logcat
+        print(log_msg)
         
     def build(self):
         self.camera_ip = '192.168.34.29'
         self.connected = False
         
-        layout = BoxLayout(orientation='vertical', padding=20, spacing=10)
+        main_layout = BoxLayout(orientation='vertical', padding=10, spacing=5)
+        
+        # Top section
+        top_section = BoxLayout(orientation='vertical', size_hint=(1, 0.6), spacing=10, padding=[10,10,10,0])
+import kivy
+kivy.require('2.0.0')
+
+from kivy.app import App
+from kivy.uix.boxlayout import BoxLayout
+from kivy.uix.label import Label
+from kivy.uix.textinput import TextInput
+from kivy.uix.button import Button
+from kivy.uix.popup import Popup
+from kivy.uix.scrollview import ScrollView
+from kivy.utils import platform
+import requests
+from requests.adapters import HTTPAdapter
+import urllib3
+import ssl
+import os
+from datetime import datetime
+
+urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
+
+# Create a custom SSL context that doesn't verify certificates
+class SSLAdapter(HTTPAdapter):
+    def init_poolmanager(self, *args, **kwargs):
+        context = ssl.create_default_context()
+        context.check_hostname = False
+        context.verify_mode = ssl.CERT_NONE
+        kwargs['ssl_context'] = context
+        return super().init_poolmanager(*args, **kwargs)
+
+# Fix SSL certificate path for Android
+if platform == 'android':
+    try:
+        import certifi
+        os.environ['SSL_CERT_FILE'] = certifi.where()
+        os.environ['REQUESTS_CA_BUNDLE'] = certifi.where()
+    except ImportError:
+        pass
+
+class CameraMetadataApp(App):
+    def __init__(self, **kwargs):
+        super().__init__(**kwargs)
+        # Create a session with custom SSL adapter
+        self.session = requests.Session()
+        self.session.mount('https://', SSLAdapter())
+        self.debug_messages = []
+        
+    def log(self, message):
+        """Add timestamped log message"""
+        timestamp = datetime.now().strftime("%H:%M:%S")
+        log_msg = f"[{timestamp}] {message}"
+        self.debug_messages.append(log_msg)
+        
+        # Keep only last 50 messages
+        if len(self.debug_messages) > 50:
+            self.debug_messages.pop(0)
+        
+        # Update debug label if it exists
+        if hasattr(self, 'debug_label'):
+            self.debug_label.text = '\n'.join(self.debug_messages)
+        
+        # Also print to console/logcat
+        print(log_msg)
+        
+    def build(self):
+        self.camera_ip = '192.168.34.29'
+        self.connected = False
+        
+        main_layout = BoxLayout(orientation='vertical', padding=10, spacing=5)
+        
+        # Top section
+        top_section = BoxLayout(orientation='vertical', size_hint=(1, 0.6), spacing=10, padding=[10,10,10,0])
         
         title = Label(
             text='Camera Metadata Manager',
-            size_hint=(1, 0.1),
+            size_hint=(1, 0.15),
             font_size='24sp',
             bold=True
         )
-        layout.add_widget(title)
+        top_section.add_widget(title)
         
-        ip_layout = BoxLayout(orientation='horizontal', size_hint=(1, 0.08), spacing=10)
+        ip_layout = BoxLayout(orientation='horizontal', size_hint=(1, 0.12), spacing=10)
         ip_label = Label(text='Camera IP:', size_hint=(0.3, 1))
         self.ip_input = TextInput(
             text=self.camera_ip,
@@ -65,40 +158,38 @@ class CameraMetadataApp(App):
         )
         ip_layout.add_widget(ip_label)
         ip_layout.add_widget(self.ip_input)
-        layout.add_widget(ip_layout)
+        top_section.add_widget(ip_layout)
         
         self.connect_btn = Button(
             text='Connect to Camera',
-            size_hint=(1, 0.08),
+            size_hint=(1, 0.12),
             background_color=(0.13, 0.59, 0.95, 1)
         )
         self.connect_btn.bind(on_press=self.connect_camera)
-        layout.add_widget(self.connect_btn)
+        top_section.add_widget(self.connect_btn)
         
         self.status_label = Label(
             text='Status: Not Connected',
-            size_hint=(1, 0.06),
+            size_hint=(1, 0.1),
             color=(1, 0, 0, 1)
         )
-        layout.add_widget(self.status_label)
-        
-        layout.add_widget(Label(size_hint=(1, 0.05)))
+        top_section.add_widget(self.status_label)
         
         copyright_label = Label(
             text='Copyright:',
-            size_hint=(1, 0.06),
+            size_hint=(1, 0.08),
             bold=True
         )
-        layout.add_widget(copyright_label)
+        top_section.add_widget(copyright_label)
         
         self.copyright_input = TextInput(
             hint_text='Enter copyright information',
-            size_hint=(1, 0.15),
+            size_hint=(1, 0.2),
             multiline=True
         )
-        layout.add_widget(self.copyright_input)
+        top_section.add_widget(self.copyright_input)
         
-        copyright_buttons = BoxLayout(orientation='horizontal', size_hint=(1, 0.08), spacing=10)
+        copyright_buttons = BoxLayout(orientation='horizontal', size_hint=(1, 0.12), spacing=10)
         
         get_copyright_btn = Button(text='Get')
         get_copyright_btn.bind(on_press=lambda x: self.get_metadata('copyright'))
@@ -111,38 +202,60 @@ class CameraMetadataApp(App):
         set_copyright_btn.bind(on_press=lambda x: self.set_metadata('copyright'))
         copyright_buttons.add_widget(set_copyright_btn)
         
-        layout.add_widget(copyright_buttons)
+        top_section.add_widget(copyright_buttons)
         
-        author_label = Label(
-            text='Author:',
-            size_hint=(1, 0.06),
-            bold=True
+        main_layout.add_widget(top_section)
+        
+        # Debug console section
+        debug_section = BoxLayout(orientation='vertical', size_hint=(1, 0.4), spacing=5, padding=[10,0,10,10])
+        
+        debug_header = BoxLayout(orientation='horizontal', size_hint=(1, 0.15), spacing=10)
+        debug_title = Label(
+            text='Debug Log:',
+            size_hint=(0.7, 1),
+            bold=True,
+            halign='left',
+            valign='middle'
         )
-        layout.add_widget(author_label)
+        debug_title.bind(size=debug_title.setter('text_size'))
         
-        self.author_input = TextInput(
-            hint_text='Enter author name',
-            size_hint=(1, 0.15),
-            multiline=True
+        clear_btn = Button(
+            text='Clear Log',
+            size_hint=(0.3, 1),
+            background_color=(0.8, 0.3, 0.3, 1)
         )
-        layout.add_widget(self.author_input)
+        clear_btn.bind(on_press=self.clear_log)
         
-        author_buttons = BoxLayout(orientation='horizontal', size_hint=(1, 0.08), spacing=10)
+        debug_header.add_widget(debug_title)
+        debug_header.add_widget(clear_btn)
+        debug_section.add_widget(debug_header)
         
-        get_author_btn = Button(text='Get')
-        get_author_btn.bind(on_press=lambda x: self.get_metadata('author'))
-        author_buttons.add_widget(get_author_btn)
-        
-        set_author_btn = Button(
-            text='Set',
-            background_color=(0.3, 0.69, 0.31, 1)
+        scroll = ScrollView(size_hint=(1, 0.85))
+        self.debug_label = Label(
+            text='',
+            size_hint_y=None,
+            markup=True,
+            halign='left',
+            valign='top',
+            font_size='10sp'
         )
-        set_author_btn.bind(on_press=lambda x: self.set_metadata('author'))
-        author_buttons.add_widget(set_author_btn)
+        self.debug_label.bind(texture_size=self.debug_label.setter('size'))
+        self.debug_label.bind(size=self.debug_label.setter('text_size'))
+        scroll.add_widget(self.debug_label)
+        debug_section.add_widget(scroll)
         
-        layout.add_widget(author_buttons)
+        main_layout.add_widget(debug_section)
         
-        return layout
+        self.log(f"App started on platform: {platform}")
+        self.log(f"Default camera IP: {self.camera_ip}")
+        
+        return main_layout
+    
+    def clear_log(self, instance):
+        """Clear debug log"""
+        self.debug_messages = []
+        self.debug_label.text = ''
+        self.log("Log cleared")
     
     def show_popup(self, title, message):
         popup = Popup(
@@ -154,18 +267,27 @@ class CameraMetadataApp(App):
     
     def connect_camera(self, instance):
         self.camera_ip = self.ip_input.text.strip()
+        self.log(f"Attempting connection to {self.camera_ip}:443")
         self.status_label.text = 'Status: Connecting...'
         self.status_label.color = (1, 1, 0, 1)
         
         try:
             url = f'https://{self.camera_ip}:443/ccapi/ver100/deviceinformation'
+            self.log(f"URL: {url}")
+            self.log("Sending GET request...")
+            
             response = self.session.get(url, timeout=10, verify=False)
+            
+            self.log(f"Response status: {response.status_code}")
             
             if response.status_code == 200:
                 data = response.json()
+                self.log(f"Response data: {data}")
                 self.connected = True
-                self.status_label.text = f'Status: Connected to {data.get("productname", "Camera")}'
+                product_name = data.get("productname", "Camera")
+                self.status_label.text = f'Status: Connected to {product_name}'
                 self.status_label.color = (0, 1, 0, 1)
+                self.log(f"Successfully connected to {product_name}")
                 self.show_popup('Success', 'Connected to camera!')
             else:
                 raise Exception(f'HTTP {response.status_code}')
@@ -174,17 +296,23 @@ class CameraMetadataApp(App):
             self.connected = False
             self.status_label.text = 'Status: SSL Error'
             self.status_label.color = (1, 0, 0, 1)
-            self.show_popup('SSL Error', f'SSL certificate error:\n{str(e)[:100]}')
+            error_msg = str(e)
+            self.log(f"SSL Error: {error_msg}")
+            self.show_popup('SSL Error', f'SSL certificate error:\n{error_msg[:100]}')
         except requests.exceptions.ConnectionError as e:
             self.connected = False
             self.status_label.text = 'Status: Connection Failed'
             self.status_label.color = (1, 0, 0, 1)
-            self.show_popup('Connection Error', f'Cannot reach camera.\nCheck WiFi and IP address.\n{str(e)[:100]}')
+            error_msg = str(e)
+            self.log(f"Connection Error: {error_msg}")
+            self.show_popup('Connection Error', f'Cannot reach camera.\n{error_msg[:100]}')
         except Exception as e:
             self.connected = False
             self.status_label.text = 'Status: Connection Failed'
             self.status_label.color = (1, 0, 0, 1)
-            self.show_popup('Error', f'Connection failed:\n{str(e)[:150]}')
+            error_msg = str(e)
+            self.log(f"Error: {error_msg}")
+            self.show_popup('Error', f'Connection failed:\n{error_msg[:150]}')
     
     def get_metadata(self, field):
         if not self.connected:
@@ -193,11 +321,15 @@ class CameraMetadataApp(App):
         
         try:
             url = f'https://{self.camera_ip}:443/ccapi/ver100/functions/registeredname/{field}'
+            self.log(f"Getting {field} from {url}")
             response = self.session.get(url, timeout=10, verify=False)
+            
+            self.log(f"Get {field} response: {response.status_code}")
             
             if response.status_code == 200:
                 data = response.json()
                 value = data.get(field, '')
+                self.log(f"{field} value: {value}")
                 
                 if field == 'copyright':
                     self.copyright_input.text = value
@@ -212,7 +344,9 @@ class CameraMetadataApp(App):
                 raise Exception(f'HTTP {response.status_code}')
                 
         except Exception as e:
-            self.show_popup('Error', f'Failed to get {field}:\n{str(e)[:150]}')
+            error_msg = str(e)
+            self.log(f"Error getting {field}: {error_msg}")
+            self.show_popup('Error', f'Failed to get {field}:\n{error_msg[:150]}')
     
     def set_metadata(self, field):
         if not self.connected:
@@ -230,6 +364,7 @@ class CameraMetadataApp(App):
         
         try:
             url = f'https://{self.camera_ip}:443/ccapi/ver100/functions/registeredname/{field}'
+            self.log(f"Setting {field} to: {value}")
             response = self.session.put(
                 url,
                 json={field: value},
@@ -237,13 +372,18 @@ class CameraMetadataApp(App):
                 verify=False
             )
             
+            self.log(f"Set {field} response: {response.status_code}")
+            
             if response.status_code == 200:
+                self.log(f"Successfully set {field}")
                 self.show_popup('Success', f'{field.capitalize()} set to:\n{value}')
             else:
                 raise Exception(f'HTTP {response.status_code}')
                 
         except Exception as e:
-            self.show_popup('Error', f'Failed to set {field}:\n{str(e)[:150]}')
+            error_msg = str(e)
+            self.log(f"Error setting {field}: {error_msg}")
+            self.show_popup('Error', f'Failed to set {field}:\n{error_msg[:150]}')
 
 if __name__ == '__main__':
     CameraMetadataApp().run()
