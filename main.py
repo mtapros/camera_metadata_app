@@ -9,10 +9,22 @@ from kivy.uix.button import Button
 from kivy.uix.popup import Popup
 from kivy.utils import platform
 import requests
+from requests.adapters import HTTPAdapter
+from requests.packages.urllib3.util.retry import Retry
 import urllib3
+import ssl
 import os
 
 urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
+
+# Create a custom SSL context that doesn't verify certificates
+class SSLAdapter(HTTPAdapter):
+    def init_poolmanager(self, *args, **kwargs):
+        context = ssl.create_default_context()
+        context.check_hostname = False
+        context.verify_mode = ssl.CERT_NONE
+        kwargs['ssl_context'] = context
+        return super().init_poolmanager(*args, **kwargs)
 
 # Fix SSL certificate path for Android
 if platform == 'android':
@@ -24,6 +36,12 @@ if platform == 'android':
         pass
 
 class CameraMetadataApp(App):
+    def __init__(self, **kwargs):
+        super().__init__(**kwargs)
+        # Create a session with custom SSL adapter
+        self.session = requests.Session()
+        self.session.mount('https://', SSLAdapter())
+        
     def build(self):
         self.camera_ip = '192.168.34.29'
         self.connected = False
@@ -141,7 +159,7 @@ class CameraMetadataApp(App):
         
         try:
             url = f'https://{self.camera_ip}:443/ccapi/ver100/deviceinformation'
-            response = requests.get(url, timeout=10, verify=False)
+            response = self.session.get(url, timeout=10, verify=False)
             
             if response.status_code == 200:
                 data = response.json()
@@ -175,7 +193,7 @@ class CameraMetadataApp(App):
         
         try:
             url = f'https://{self.camera_ip}:443/ccapi/ver100/functions/registeredname/{field}'
-            response = requests.get(url, timeout=10, verify=False)
+            response = self.session.get(url, timeout=10, verify=False)
             
             if response.status_code == 200:
                 data = response.json()
@@ -212,7 +230,7 @@ class CameraMetadataApp(App):
         
         try:
             url = f'https://{self.camera_ip}:443/ccapi/ver100/functions/registeredname/{field}'
-            response = requests.put(
+            response = self.session.put(
                 url,
                 json={field: value},
                 timeout=10,
