@@ -33,7 +33,7 @@ jobs:
             build-essential ccache \
             libltdl-dev \
             ant \
-            apktool aapt zipalign
+            zipalign
 
       - name: Create venv and install Buildozer
         run: |
@@ -78,62 +78,4 @@ jobs:
           echo "e9acab5b5fbb560a72cfaecce8946896ff6aab9d" > "$ANDROID_HOME/licenses/android-sdk-preview-license"
           echo "84831b9409646a918e30573bab4c9c91346d8abd" > "$ANDROID_HOME/licenses/android-googletv-license"
           echo "d975f751698a77b662f1254ddbeed3901e976f5a" > "$ANDROID_HOME/licenses/intel-android-extra-license"
-          yes | "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" --licenses || true
-
-      - name: Install Android SDK components
-        run: |
-          export ANDROID_HOME="$HOME/.buildozer/android/platform/android-sdk"
-          "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" --sdk_root="$ANDROID_HOME" \
-            "platform-tools" \
-            "platforms;android-31" \
-            "build-tools;34.0.0" \
-            "ndk;25.2.9519653"
-
-      - name: Build APK
-        run: |
-          . .venv/bin/activate
-          buildozer -v android debug
-
-      - name: Patch APK to add INTERNET permission
-        run: |
-          cd bin
-          APK_FILE=$(ls camerametadataapp-*-debug.apk)
-          echo "Patching $APK_FILE"
-          
-          # Decompile APK
-          apktool d "$APK_FILE" -o patched -f
-          
-          # Check current manifest
-          echo "=== Original manifest permissions ==="
-          grep -A5 "uses-permission" patched/AndroidManifest.xml || echo "No permissions found"
-          
-          # Add INTERNET permission after the manifest tag
-          sed -i '/<manifest/a\    <uses-permission android:name="android.permission.INTERNET"/>\n    <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE"/>\n    <uses-permission android:name="android.permission.ACCESS_WIFI_STATE"/>\n    <uses-permission android:name="android.permission.CHANGE_WIFI_STATE"/>' patched/AndroidManifest.xml
-          
-          # Verify it was added
-          echo "=== Patched manifest permissions ==="
-          grep -A5 "uses-permission" patched/AndroidManifest.xml
-          
-          # Rebuild APK
-          apktool b patched -o camerametadataapp-patched.apk
-          
-          # Create debug keystore if it doesn't exist
-          if [ ! -f ~/.android/debug.keystore ]; then
-            mkdir -p ~/.android
-            keytool -genkey -v -keystore ~/.android/debug.keystore -storepass android -alias androiddebugkey -keypass android -keyalg RSA -keysize 2048 -validity 10000 -dname "CN=Android Debug,O=Android,C=US"
-          fi
-          
-          # Sign it
-          jarsigner -verbose -sigalg SHA256withRSA -digestalg SHA256 -keystore ~/.android/debug.keystore -storepass android camerametadataapp-patched.apk androiddebugkey
-          
-          # Zipalign
-          zipalign -v 4 camerametadataapp-patched.apk camerametadataapp-final.apk
-          
-          echo "=== Patched APK created ==="
-          ls -lh camerametadataapp-final.apk
-
-      - name: Upload Patched APK artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: camerametadataapp-apk-patched
-          path: bin/camerametadataapp-final.apk
+          yes | "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" --licenses || 
