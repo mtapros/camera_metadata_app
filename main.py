@@ -9,6 +9,7 @@ from kivy.uix.button import Button
 from kivy.uix.popup import Popup
 from kivy.uix.scrollview import ScrollView
 from kivy.utils import platform
+from kivy.clock import Clock
 import urllib.request
 import urllib.error
 import json
@@ -40,10 +41,29 @@ class CameraMetadataApp(App):
         
         # Also print to console/logcat
         print(log_msg)
+    
+    def request_android_permissions(self):
+        """Request necessary Android permissions"""
+        if platform == 'android':
+            try:
+                from android.permissions import request_permissions, Permission
+                self.log("Requesting Android permissions...")
+                request_permissions([
+                    Permission.INTERNET,
+                    Permission.ACCESS_NETWORK_STATE,
+                    Permission.ACCESS_WIFI_STATE,
+                    Permission.CHANGE_WIFI_STATE
+                ])
+                self.log("Permissions requested")
+            except Exception as e:
+                self.log(f"Permission request failed: {e}")
         
     def build(self):
         self.camera_ip = '192.168.34.29'
         self.connected = False
+        
+        # Request permissions after a short delay
+        Clock.schedule_once(lambda dt: self.request_android_permissions(), 1)
         
         main_layout = BoxLayout(orientation='vertical', padding=10, spacing=5)
         
@@ -157,7 +177,7 @@ class CameraMetadataApp(App):
         
         self.log(f"App started on platform: {platform}")
         self.log(f"Default camera IP: {self.camera_ip}")
-        self.log(f"SSL context created: verify_mode={self.ssl_context.verify_mode}")
+        self.log(f"SSL context: verify={self.ssl_context.verify_mode}")
         
         return main_layout
     
@@ -189,16 +209,21 @@ class CameraMetadataApp(App):
                 req.add_header('Content-Type', 'application/json')
             
             self.log("Opening URL connection...")
-            with urllib.request.urlopen(req, context=self.ssl_context, timeout=10) as response:
+            
+            # Add headers to help with some network issues
+            req.add_header('User-Agent', 'CameraMetadataApp/1.0')
+            
+            with urllib.request.urlopen(req, context=self.ssl_context, timeout=15) as response:
                 self.log(f"Response status: {response.status}")
                 response_data = response.read().decode('utf-8')
-                self.log(f"Response data: {response_data[:200]}")
+                self.log(f"Response length: {len(response_data)} bytes")
                 return json.loads(response_data), response.status
                 
         except urllib.error.HTTPError as e:
             self.log(f"HTTPError: {e.code} {e.reason}")
             raise Exception(f"HTTP {e.code}: {e.reason}")
         except urllib.error.URLError as e:
+            self.log(f"URLError type: {type(e.reason)}")
             self.log(f"URLError: {e.reason}")
             raise Exception(f"URL Error: {e.reason}")
         except Exception as e:
