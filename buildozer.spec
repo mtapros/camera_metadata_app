@@ -30,3 +30,6 @@ android.permissions = INTERNET,ACCESS_NETWORK_STATE,ACCESS_WIFI_STATE,CHANGE_WIF
 android.private_storage = True
 android.enable_androidx = True
 android.release_artifact = apk
+
+# This tells Buildozer to copy the templates folder
+android.add_src = templates
