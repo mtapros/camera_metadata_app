@@ -30,23 +30,31 @@ jobs:
           python -m pip install --upgrade pip setuptools wheel
           python -m pip install "Cython==0.29.33" buildozer
 
-      - name: Debug show workspace spec
+      - name: Show buildozer.spec
         run: |
           pwd
           ls -la
-          echo "---- buildozer.spec ----"
           sed -n '1,240p' buildozer.spec
 
-      - name: Build APK
+      # First run: lets Buildozer download SDK/NDK into ~/.buildozer (may fail on licenses)
+      - name: Build (bootstrap)
         run: |
           . .venv/bin/activate
           buildozer -v android debug || true
 
-      - name: Accept Android SDK licenses (CI)
+      # Accept licenses non-interactively (standard CI approach)
+      - name: Accept Android SDK licenses
         run: |
           yes | "$HOME/.buildozer/android/platform/android-sdk/tools/bin/sdkmanager" --licenses || true
 
-      - name: Build APK (after licenses)
+      # Optional: force-install build-tools (fixes "Aidl not found" when build-tools weren't installed)
+      - name: Install Android build-tools
+        run: |
+          "$HOME/.buildozer/android/platform/android-sdk/tools/bin/sdkmanager" \
+            --sdk_root="$HOME/.buildozer/android/platform/android-sdk" \
+            "build-tools;36.1.0"
+
+      - name: Build APK
         run: |
           . .venv/bin/activate
           buildozer -v android debug
