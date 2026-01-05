@@ -20,37 +20,4 @@ jobs:
             git zip unzip \
             openjdk-17-jdk \
             autoconf automake libtool pkg-config \
-            zlib1g-dev libncurses5-dev libncursesw5-dev libtinfo5 \
-            cmake libffi-dev libssl-dev
-
-      - name: Install Buildozer + pinned Cython
-        run: |
-          python3 -m pip install --upgrade pip setuptools wheel
-          python3 -m pip install "Cython==0.29.33" buildozer
-
-      - name: Make build non-interactive
-        run: |
-          # Avoid root prompt and accept SDK licenses automatically in CI
-          if grep -q "^\[buildozer\]" buildozer.spec; then
-            grep -q "^warn_on_root" buildozer.spec && \
-              sed -i 's/^warn_on_root.*/warn_on_root = 0/' buildozer.spec || \
-              sed -i '/^\[buildozer\]/a warn_on_root = 0' buildozer.spec
-          else
-            printf '\n[buildozer]\nwarn_on_root = 0\n' >> buildozer.spec
-          fi
-
-          if grep -q "^android.accept_sdk_license" buildozer.spec; then
-            sed -i 's/^android\.accept_sdk_license.*/android.accept_sdk_license = True/' buildozer.spec
-          else
-            printf '\nandroid.accept_sdk_license = True\n' >> buildozer.spec
-          fi
-
-      - name: Build APK
-        run: |
-          buildozer -v android debug
-
-      - name: Upload APK artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: camera-metadata-app
-          path: bin/*.apk
+            zlib1g-dev libncurses5-dev libncu
