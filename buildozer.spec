@@ -19,11 +19,15 @@ warn_on_root = 0
 android.api = 31
 android.minapi = 21
 
-# Buildozer-side switch (keep it)
+# Buildozer-side switch
 android.accept_sdk_license = True
 
 android.ndk = 25b
 android.ndk_api = 21
+
+# Specify a valid build-tools version that exists
+android.skip_update = False
+android.sdk_path = 
 
 android.permissions = INTERNET,ACCESS_NETWORK_STATE,ACCESS_WIFI_STATE,CHANGE_WIFI_STATE
 android.private_storage = True
