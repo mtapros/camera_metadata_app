@@ -24,12 +24,14 @@ jobs:
         run: |
           sudo apt-get update
           sudo apt-get install -y \
-            python3 python3-venv \
+            python3 python3-venv python3-dev \
             git zip unzip wget curl \
             openjdk-17-jdk \
-            autoconf automake libtool pkg-config \
+            autoconf automake libtool libtool-bin pkg-config \
             zlib1g-dev libncurses5-dev libncursesw5-dev \
             cmake libffi-dev libssl-dev \
+            build-essential ccache \
+            libltdl-dev \
             ant
 
       - name: Create venv and install Buildozer
