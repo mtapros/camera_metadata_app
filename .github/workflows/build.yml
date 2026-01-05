@@ -30,7 +30,7 @@ jobs:
           python -m pip install --upgrade pip setuptools wheel
           python -m pip install "Cython==0.29.33" buildozer
 
-      - name: Debug: show workspace + spec
+      - name: Debug show workspace spec
         run: |
           pwd
           ls -la
