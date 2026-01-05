@@ -17,17 +17,20 @@ jobs:
         with:
           path: .buildozer
           key: buildozer-${{ hashFiles('buildozer.spec') }}
+          restore-keys: |
+            buildozer-
 
       - name: Install system dependencies
         run: |
           sudo apt-get update
           sudo apt-get install -y \
             python3 python3-venv \
-            git zip unzip \
+            git zip unzip wget curl \
             openjdk-17-jdk \
             autoconf automake libtool pkg-config \
             zlib1g-dev libncurses5-dev libncursesw5-dev \
-            cmake libffi-dev libssl-dev
+            cmake libffi-dev libssl-dev \
+            ant
 
       - name: Create venv and install Buildozer
         run: |
@@ -36,19 +39,32 @@ jobs:
           python -m pip install --upgrade pip setuptools wheel
           python -m pip install "Cython==0.29.36" buildozer
 
-      - name: Download and setup Android cmdline-tools
+      - name: Setup Apache Ant manually
+        run: |
+          mkdir -p "$HOME/.buildozer/android/platform"
+          if [ ! -d "$HOME/.buildozer/android/platform/apache-ant-1.9.4" ]; then
+            cd "$HOME/.buildozer/android/platform"
+            wget -q https://archive.apache.org/dist/ant/binaries/apache-ant-1.9.4-bin.tar.gz
+            tar -xzf apache-ant-1.9.4-bin.tar.gz
+            rm apache-ant-1.9.4-bin.tar.gz
+          fi
+
+      - name: Download Android SDK cmdline-tools
         run: |
           mkdir -p "$HOME/.buildozer/android/platform/android-sdk/cmdline-tools"
-          cd "$HOME/.buildozer/android/platform/android-sdk/cmdline-tools"
-          wget -q https://dl.google.com/android/repository/commandlinetools-linux-9477386_latest.zip
-          unzip -q commandlinetools-linux-9477386_latest.zip
-          mv cmdline-tools latest
-          rm commandlinetools-linux-9477386_latest.zip
+          if [ ! -d "$HOME/.buildozer/android/platform/android-sdk/cmdline-tools/latest" ]; then
+            cd "$HOME/.buildozer/android/platform/android-sdk/cmdline-tools"
+            wget -q https://dl.google.com/android/repository/commandlinetools-linux-9477386_latest.zip
+            unzip -q commandlinetools-linux-9477386_latest.zip
+            mv cmdline-tools latest
+            rm commandlinetools-linux-9477386_latest.zip
+          fi
 
-      - name: Create legacy tools directory structure
+      - name: Create legacy tools directory for Buildozer compatibility
         run: |
           mkdir -p "$HOME/.buildozer/android/platform/android-sdk/tools/bin"
-          ln -s "$HOME/.buildozer/android/platform/android-sdk/cmdline-tools/latest/bin/sdkmanager" "$HOME/.buildozer/android/platform/android-sdk/tools/bin/sdkmanager"
+          ln -sf "$HOME/.buildozer/android/platform/android-sdk/cmdline-tools/latest/bin/sdkmanager" "$HOME/.buildozer/android/platform/android-sdk/tools/bin/sdkmanager"
+          ln -sf "$HOME/.buildozer/android/platform/android-sdk/cmdline-tools/latest/bin/avdmanager" "$HOME/.buildozer/android/platform/android-sdk/tools/bin/avdmanager"
 
       - name: Accept all Android SDK licenses
         run: |
@@ -61,10 +77,14 @@ jobs:
           echo "d975f751698a77b662f1254ddbeed3901e976f5a" > "$ANDROID_HOME/licenses/intel-android-extra-license"
           yes | "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" --licenses || true
 
-      - name: Install required SDK packages
+      - name: Install Android SDK components
         run: |
           export ANDROID_HOME="$HOME/.buildozer/android/platform/android-sdk"
-          "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" --sdk_root="$ANDROID_HOME" "platform-tools" "platforms;android-31" "build-tools;34.0.0"
+          "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" --sdk_root="$ANDROID_HOME" \
+            "platform-tools" \
+            "platforms;android-31" \
+            "build-tools;34.0.0" \
+            "ndk;25.2.9519653"
 
       - name: Build APK
         run: |
