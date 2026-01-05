@@ -14,11 +14,18 @@ jobs:
 
       - name: Build APK (Buildozer in Docker)
         run: |
+          # Ensure Buildozer won't prompt about running as root in CI
+          if grep -q "^warn_on_root" buildozer.spec; then
+            sed -i 's/^warn_on_root.*/warn_on_root = 0/' buildozer.spec
+          else
+            printf '\n[buildozer]\nwarn_on_root = 0\n' >> buildozer.spec
+          fi
+
           docker run --rm \
             -v "$GITHUB_WORKSPACE":/home/user/app \
             -w /home/user/app \
             kivy/buildozer \
-            bash -lc "printf 'y\n' | buildozer -v android debug"
+            buildozer -v android debug
 
       - name: Upload APK artifact
         uses: actions/upload-artifact@v4
