@@ -36,19 +36,40 @@ jobs:
           python -m pip install --upgrade pip setuptools wheel
           python -m pip install "Cython==0.29.36" buildozer
 
-      - name: Pre-accept all Android SDK licenses
+      - name: Download and setup Android cmdline-tools
         run: |
-          mkdir -p "$HOME/.buildozer/android/platform/android-sdk/licenses"
-          echo "24333f8a63b6825ea9c5514f83c2829b004d1fee" > "$HOME/.buildozer/android/platform/android-sdk/licenses/android-sdk-license"
-          echo "d56f5187479451eabf01fb78af6dfcb131a6481e" >> "$HOME/.buildozer/android/platform/android-sdk/licenses/android-sdk-license"
-          echo "e9acab5b5fbb560a72cfaecce8946896ff6aab9d" > "$HOME/.buildozer/android/platform/android-sdk/licenses/android-sdk-preview-license"
-          echo "84831b9409646a918e30573bab4c9c91346d8abd" > "$HOME/.buildozer/android/platform/android-sdk/licenses/android-googletv-license"
-          echo "d975f751698a77b662f1254ddbeed3901e976f5a" > "$HOME/.buildozer/android/platform/android-sdk/licenses/intel-android-extra-license"
+          mkdir -p "$HOME/.buildozer/android/platform/android-sdk/cmdline-tools"
+          cd "$HOME/.buildozer/android/platform/android-sdk/cmdline-tools"
+          wget -q https://dl.google.com/android/repository/commandlinetools-linux-9477386_latest.zip
+          unzip -q commandlinetools-linux-9477386_latest.zip
+          mv cmdline-tools latest
+          rm commandlinetools-linux-9477386_latest.zip
 
-      - name: Build APK (accept licenses during build)
+      - name: Create legacy tools directory structure
+        run: |
+          mkdir -p "$HOME/.buildozer/android/platform/android-sdk/tools/bin"
+          ln -s "$HOME/.buildozer/android/platform/android-sdk/cmdline-tools/latest/bin/sdkmanager" "$HOME/.buildozer/android/platform/android-sdk/tools/bin/sdkmanager"
+
+      - name: Accept all Android SDK licenses
+        run: |
+          export ANDROID_HOME="$HOME/.buildozer/android/platform/android-sdk"
+          mkdir -p "$ANDROID_HOME/licenses"
+          echo "24333f8a63b6825ea9c5514f83c2829b004d1fee" > "$ANDROID_HOME/licenses/android-sdk-license"
+          echo "d56f5187479451eabf01fb78af6dfcb131a6481e" >> "$ANDROID_HOME/licenses/android-sdk-license"
+          echo "e9acab5b5fbb560a72cfaecce8946896ff6aab9d" > "$ANDROID_HOME/licenses/android-sdk-preview-license"
+          echo "84831b9409646a918e30573bab4c9c91346d8abd" > "$ANDROID_HOME/licenses/android-googletv-license"
+          echo "d975f751698a77b662f1254ddbeed3901e976f5a" > "$ANDROID_HOME/licenses/intel-android-extra-license"
+          yes | "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" --licenses || true
+
+      - name: Install required SDK packages
+        run: |
+          export ANDROID_HOME="$HOME/.buildozer/android/platform/android-sdk"
+          "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" --sdk_root="$ANDROID_HOME" "platform-tools" "platforms;android-31" "build-tools;34.0.0"
+
+      - name: Build APK
         run: |
           . .venv/bin/activate
-          yes | buildozer -v android debug || buildozer -v android debug
+          buildozer -v android debug
 
       - name: Upload APK artifact
         uses: actions/upload-artifact@v4
