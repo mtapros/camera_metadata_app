@@ -12,7 +12,6 @@ orientation = portrait
 fullscreen = 0
 
 android.manifest.application_attrs = android:usesCleartextTraffic="true",android:networkSecurityConfig="@xml/network_security_config"
-p4a.source_dir = .
 
 [buildozer]
 log_level = 2
