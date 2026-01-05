@@ -7,10 +7,21 @@ from kivy.uix.label import Label
 from kivy.uix.textinput import TextInput
 from kivy.uix.button import Button
 from kivy.uix.popup import Popup
+from kivy.utils import platform
 import requests
 import urllib3
+import os
 
 urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
+
+# Fix SSL certificate path for Android
+if platform == 'android':
+    try:
+        import certifi
+        os.environ['SSL_CERT_FILE'] = certifi.where()
+        os.environ['REQUESTS_CA_BUNDLE'] = certifi.where()
+    except ImportError:
+        pass
 
 class CameraMetadataApp(App):
     def build(self):
@@ -130,7 +141,7 @@ class CameraMetadataApp(App):
         
         try:
             url = f'https://{self.camera_ip}:443/ccapi/ver100/deviceinformation'
-            response = requests.get(url, timeout=5, verify=False)
+            response = requests.get(url, timeout=10, verify=False)
             
             if response.status_code == 200:
                 data = response.json()
@@ -141,11 +152,21 @@ class CameraMetadataApp(App):
             else:
                 raise Exception(f'HTTP {response.status_code}')
                 
+        except requests.exceptions.SSLError as e:
+            self.connected = False
+            self.status_label.text = 'Status: SSL Error'
+            self.status_label.color = (1, 0, 0, 1)
+            self.show_popup('SSL Error', f'SSL certificate error:\n{str(e)[:100]}')
+        except requests.exceptions.ConnectionError as e:
+            self.connected = False
+            self.status_label.text = 'Status: Connection Failed'
+            self.status_label.color = (1, 0, 0, 1)
+            self.show_popup('Connection Error', f'Cannot reach camera.\nCheck WiFi and IP address.\n{str(e)[:100]}')
         except Exception as e:
             self.connected = False
             self.status_label.text = 'Status: Connection Failed'
             self.status_label.color = (1, 0, 0, 1)
-            self.show_popup('Error', f'Connection failed:\n{str(e)}')
+            self.show_popup('Error', f'Connection failed:\n{str(e)[:150]}')
     
     def get_metadata(self, field):
         if not self.connected:
@@ -154,7 +175,7 @@ class CameraMetadataApp(App):
         
         try:
             url = f'https://{self.camera_ip}:443/ccapi/ver100/functions/registeredname/{field}'
-            response = requests.get(url, timeout=5, verify=False)
+            response = requests.get(url, timeout=10, verify=False)
             
             if response.status_code == 200:
                 data = response.json()
@@ -173,7 +194,7 @@ class CameraMetadataApp(App):
                 raise Exception(f'HTTP {response.status_code}')
                 
         except Exception as e:
-            self.show_popup('Error', f'Failed to get {field}:\n{str(e)}')
+            self.show_popup('Error', f'Failed to get {field}:\n{str(e)[:150]}')
     
     def set_metadata(self, field):
         if not self.connected:
@@ -194,7 +215,7 @@ class CameraMetadataApp(App):
             response = requests.put(
                 url,
                 json={field: value},
-                timeout=5,
+                timeout=10,
                 verify=False
             )
             
@@ -204,7 +225,7 @@ class CameraMetadataApp(App):
                 raise Exception(f'HTTP {response.status_code}')
                 
         except Exception as e:
-            self.show_popup('Error', f'Failed to set {field}:\n{str(e)}')
+            self.show_popup('Error', f'Failed to set {field}:\n{str(e)[:150]}')
 
 if __name__ == '__main__':
     CameraMetadataApp().run()
