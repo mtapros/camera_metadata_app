@@ -9,111 +9,20 @@ from kivy.uix.button import Button
 from kivy.uix.popup import Popup
 from kivy.uix.scrollview import ScrollView
 from kivy.utils import platform
-import requests
-from requests.adapters import HTTPAdapter
-import urllib3
+import urllib.request
+import urllib.error
+import json
 import ssl
-import os
 from datetime import datetime
-
-urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
-
-# Create a custom SSL context that doesn't verify certificates
-class SSLAdapter(HTTPAdapter):
-    def init_poolmanager(self, *args, **kwargs):
-        context = ssl.create_default_context()
-        context.check_hostname = False
-        context.verify_mode = ssl.CERT_NONE
-        kwargs['ssl_context'] = context
-        return super().init_poolmanager(*args, **kwargs)
-
-# Fix SSL certificate path for Android
-if platform == 'android':
-    try:
-        import certifi
-        os.environ['SSL_CERT_FILE'] = certifi.where()
-        os.environ['REQUESTS_CA_BUNDLE'] = certifi.where()
-    except ImportError:
-        pass
 
 class CameraMetadataApp(App):
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
-        # Create a session with custom SSL adapter
-        self.session = requests.Session()
-        self.session.mount('https://', SSLAdapter())
         self.debug_messages = []
-        
-    def log(self, message):
-        """Add timestamped log message"""
-        timestamp = datetime.now().strftime("%H:%M:%S")
-        log_msg = f"[{timestamp}] {message}"
-        self.debug_messages.append(log_msg)
-        
-        # Keep only last 50 messages
-        if len(self.debug_messages) > 50:
-            self.debug_messages.pop(0)
-        
-        # Update debug label if it exists
-        if hasattr(self, 'debug_label'):
-            self.debug_label.text = '\n'.join(self.debug_messages)
-        
-        # Also print to console/logcat
-        print(log_msg)
-        
-    def build(self):
-        self.camera_ip = '192.168.34.29'
-        self.connected = False
-        
-        main_layout = BoxLayout(orientation='vertical', padding=10, spacing=5)
-        
-        # Top section
-        top_section = BoxLayout(orientation='vertical', size_hint=(1, 0.6), spacing=10, padding=[10,10,10,0])
-import kivy
-kivy.require('2.0.0')
-
-from kivy.app import App
-from kivy.uix.boxlayout import BoxLayout
-from kivy.uix.label import Label
-from kivy.uix.textinput import TextInput
-from kivy.uix.button import Button
-from kivy.uix.popup import Popup
-from kivy.uix.scrollview import ScrollView
-from kivy.utils import platform
-import requests
-from requests.adapters import HTTPAdapter
-import urllib3
-import ssl
-import os
-from datetime import datetime
-
-urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
-
-# Create a custom SSL context that doesn't verify certificates
-class SSLAdapter(HTTPAdapter):
-    def init_poolmanager(self, *args, **kwargs):
-        context = ssl.create_default_context()
-        context.check_hostname = False
-        context.verify_mode = ssl.CERT_NONE
-        kwargs['ssl_context'] = context
-        return super().init_poolmanager(*args, **kwargs)
-
-# Fix SSL certificate path for Android
-if platform == 'android':
-    try:
-        import certifi
-        os.environ['SSL_CERT_FILE'] = certifi.where()
-        os.environ['REQUESTS_CA_BUNDLE'] = certifi.where()
-    except ImportError:
-        pass
-
-class CameraMetadataApp(App):
-    def __init__(self, **kwargs):
-        super().__init__(**kwargs)
-        # Create a session with custom SSL adapter
-        self.session = requests.Session()
-        self.session.mount('https://', SSLAdapter())
-        self.debug_messages = []
+        # Create SSL context that doesn't verify certificates
+        self.ssl_context = ssl.create_default_context()
+        self.ssl_context.check_hostname = False
+        self.ssl_context.verify_mode = ssl.CERT_NONE
         
     def log(self, message):
         """Add timestamped log message"""
@@ -248,6 +157,7 @@ class CameraMetadataApp(App):
         
         self.log(f"App started on platform: {platform}")
         self.log(f"Default camera IP: {self.camera_ip}")
+        self.log(f"SSL context created: verify_mode={self.ssl_context.verify_mode}")
         
         return main_layout
     
@@ -265,53 +175,64 @@ class CameraMetadataApp(App):
         )
         popup.open()
     
+    def make_request(self, url, method='GET', data=None):
+        """Make HTTP request using urllib"""
+        self.log(f"Making {method} request to: {url}")
+        
+        try:
+            if data:
+                data = json.dumps(data).encode('utf-8')
+                self.log(f"Request data: {data}")
+            
+            req = urllib.request.Request(url, data=data, method=method)
+            if data:
+                req.add_header('Content-Type', 'application/json')
+            
+            self.log("Opening URL connection...")
+            with urllib.request.urlopen(req, context=self.ssl_context, timeout=10) as response:
+                self.log(f"Response status: {response.status}")
+                response_data = response.read().decode('utf-8')
+                self.log(f"Response data: {response_data[:200]}")
+                return json.loads(response_data), response.status
+                
+        except urllib.error.HTTPError as e:
+            self.log(f"HTTPError: {e.code} {e.reason}")
+            raise Exception(f"HTTP {e.code}: {e.reason}")
+        except urllib.error.URLError as e:
+            self.log(f"URLError: {e.reason}")
+            raise Exception(f"URL Error: {e.reason}")
+        except Exception as e:
+            self.log(f"Exception type: {type(e).__name__}")
+            self.log(f"Exception: {str(e)}")
+            raise
+    
     def connect_camera(self, instance):
         self.camera_ip = self.ip_input.text.strip()
-        self.log(f"Attempting connection to {self.camera_ip}:443")
+        self.log(f"=== Connection attempt started ===")
+        self.log(f"Target: {self.camera_ip}:443")
         self.status_label.text = 'Status: Connecting...'
         self.status_label.color = (1, 1, 0, 1)
         
         try:
             url = f'https://{self.camera_ip}:443/ccapi/ver100/deviceinformation'
-            self.log(f"URL: {url}")
-            self.log("Sending GET request...")
+            data, status = self.make_request(url)
             
-            response = self.session.get(url, timeout=10, verify=False)
-            
-            self.log(f"Response status: {response.status_code}")
-            
-            if response.status_code == 200:
-                data = response.json()
-                self.log(f"Response data: {data}")
+            if status == 200:
                 self.connected = True
                 product_name = data.get("productname", "Camera")
                 self.status_label.text = f'Status: Connected to {product_name}'
                 self.status_label.color = (0, 1, 0, 1)
-                self.log(f"Successfully connected to {product_name}")
+                self.log(f"SUCCESS: Connected to {product_name}")
                 self.show_popup('Success', 'Connected to camera!')
             else:
-                raise Exception(f'HTTP {response.status_code}')
+                raise Exception(f'HTTP {status}')
                 
-        except requests.exceptions.SSLError as e:
-            self.connected = False
-            self.status_label.text = 'Status: SSL Error'
-            self.status_label.color = (1, 0, 0, 1)
-            error_msg = str(e)
-            self.log(f"SSL Error: {error_msg}")
-            self.show_popup('SSL Error', f'SSL certificate error:\n{error_msg[:100]}')
-        except requests.exceptions.ConnectionError as e:
-            self.connected = False
-            self.status_label.text = 'Status: Connection Failed'
-            self.status_label.color = (1, 0, 0, 1)
-            error_msg = str(e)
-            self.log(f"Connection Error: {error_msg}")
-            self.show_popup('Connection Error', f'Cannot reach camera.\n{error_msg[:100]}')
         except Exception as e:
             self.connected = False
             self.status_label.text = 'Status: Connection Failed'
             self.status_label.color = (1, 0, 0, 1)
             error_msg = str(e)
-            self.log(f"Error: {error_msg}")
+            self.log(f"FAILED: {error_msg}")
             self.show_popup('Error', f'Connection failed:\n{error_msg[:150]}')
     
     def get_metadata(self, field):
@@ -321,13 +242,9 @@ class CameraMetadataApp(App):
         
         try:
             url = f'https://{self.camera_ip}:443/ccapi/ver100/functions/registeredname/{field}'
-            self.log(f"Getting {field} from {url}")
-            response = self.session.get(url, timeout=10, verify=False)
+            data, status = self.make_request(url)
             
-            self.log(f"Get {field} response: {response.status_code}")
-            
-            if response.status_code == 200:
-                data = response.json()
+            if status == 200:
                 value = data.get(field, '')
                 self.log(f"{field} value: {value}")
                 
@@ -341,7 +258,7 @@ class CameraMetadataApp(App):
                 else:
                     self.show_popup('Info', f'{field.capitalize()} is empty')
             else:
-                raise Exception(f'HTTP {response.status_code}')
+                raise Exception(f'HTTP {status}')
                 
         except Exception as e:
             error_msg = str(e)
@@ -364,21 +281,13 @@ class CameraMetadataApp(App):
         
         try:
             url = f'https://{self.camera_ip}:443/ccapi/ver100/functions/registeredname/{field}'
-            self.log(f"Setting {field} to: {value}")
-            response = self.session.put(
-                url,
-                json={field: value},
-                timeout=10,
-                verify=False
-            )
+            data, status = self.make_request(url, method='PUT', data={field: value})
             
-            self.log(f"Set {field} response: {response.status_code}")
-            
-            if response.status_code == 200:
+            if status == 200:
                 self.log(f"Successfully set {field}")
                 self.show_popup('Success', f'{field.capitalize()} set to:\n{value}')
             else:
-                raise Exception(f'HTTP {response.status_code}')
+                raise Exception(f'HTTP {status}')
                 
         except Exception as e:
             error_msg = str(e)
