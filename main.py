@@ -11,6 +11,7 @@ from kivy.uix.scrollview import ScrollView
 from kivy.utils import platform
 import socket
 import ssl
+import json
 from datetime import datetime
 
 class CameraMetadataApp(App):
@@ -38,18 +39,19 @@ class CameraMetadataApp(App):
         
         main_layout = BoxLayout(orientation='vertical', padding=10, spacing=5)
         
-        # Top section
-        top_section = BoxLayout(orientation='vertical', size_hint=(1, 0.6), spacing=10, padding=[10,10,10,0])
+        # Top section - Connection and Metadata
+        top_section = BoxLayout(orientation='vertical', size_hint=(1, 0.7), spacing=10, padding=[10,10,10,0])
         
         title = Label(
             text='Camera Metadata Manager',
-            size_hint=(1, 0.15),
+            size_hint=(1, 0.08),
             font_size='24sp',
             bold=True
         )
         top_section.add_widget(title)
         
-        ip_layout = BoxLayout(orientation='horizontal', size_hint=(1, 0.12), spacing=10)
+        # IP input
+        ip_layout = BoxLayout(orientation='horizontal', size_hint=(1, 0.07), spacing=10)
         ip_label = Label(text='Camera IP:', size_hint=(0.3, 1))
         self.ip_input = TextInput(
             text=self.camera_ip,
@@ -60,46 +62,102 @@ class CameraMetadataApp(App):
         ip_layout.add_widget(self.ip_input)
         top_section.add_widget(ip_layout)
         
-        # Test buttons
-        test_layout = BoxLayout(orientation='horizontal', size_hint=(1, 0.12), spacing=10)
-        
-        self.test_socket_btn = Button(
-            text='Test Socket',
-            background_color=(0.8, 0.4, 0.2, 1)
-        )
-        self.test_socket_btn.bind(on_press=self.test_socket)
-        test_layout.add_widget(self.test_socket_btn)
-        
-        self.test_ssl_btn = Button(
-            text='Test SSL',
-            background_color=(0.8, 0.6, 0.2, 1)
-        )
-        self.test_ssl_btn.bind(on_press=self.test_ssl_socket)
-        test_layout.add_widget(self.test_ssl_btn)
-        
-        top_section.add_widget(test_layout)
-        
+        # Connect button
         self.connect_btn = Button(
             text='Connect to Camera',
-            size_hint=(1, 0.12),
+            size_hint=(1, 0.07),
             background_color=(0.13, 0.59, 0.95, 1)
         )
         self.connect_btn.bind(on_press=self.connect_camera)
         top_section.add_widget(self.connect_btn)
         
+        # Status
         self.status_label = Label(
             text='Status: Not Connected',
-            size_hint=(1, 0.1),
+            size_hint=(1, 0.06),
             color=(1, 0, 0, 1)
         )
         top_section.add_widget(self.status_label)
         
+        # Author input
+        author_layout = BoxLayout(orientation='horizontal', size_hint=(1, 0.07), spacing=10)
+        author_label = Label(text='Author:', size_hint=(0.3, 1))
+        self.author_input = TextInput(
+            text='',
+            size_hint=(0.7, 1),
+            multiline=False,
+            hint_text='Enter author name'
+        )
+        author_layout.add_widget(author_label)
+        author_layout.add_widget(self.author_input)
+        top_section.add_widget(author_layout)
+        
+        # Copyright input
+        copyright_layout = BoxLayout(orientation='horizontal', size_hint=(1, 0.07), spacing=10)
+        copyright_label = Label(text='Copyright:', size_hint=(0.3, 1))
+        self.copyright_input = TextInput(
+            text='',
+            size_hint=(0.7, 1),
+            multiline=False,
+            hint_text='Enter copyright info'
+        )
+        copyright_layout.add_widget(copyright_label)
+        copyright_layout.add_widget(self.copyright_input)
+        top_section.add_widget(copyright_layout)
+        
+        # Owner Name input
+        owner_layout = BoxLayout(orientation='horizontal', size_hint=(1, 0.07), spacing=10)
+        owner_label = Label(text='Owner Name:', size_hint=(0.3, 1))
+        self.owner_input = TextInput(
+            text='',
+            size_hint=(0.7, 1),
+            multiline=False,
+            hint_text='Enter owner name'
+        )
+        owner_layout.add_widget(owner_label)
+        owner_layout.add_widget(self.owner_input)
+        top_section.add_widget(owner_layout)
+        
+        # Nickname input
+        nickname_layout = BoxLayout(orientation='horizontal', size_hint=(1, 0.07), spacing=10)
+        nickname_label = Label(text='Nickname:', size_hint=(0.3, 1))
+        self.nickname_input = TextInput(
+            text='',
+            size_hint=(0.7, 1),
+            multiline=False,
+            hint_text='Enter camera nickname'
+        )
+        nickname_layout.add_widget(nickname_label)
+        nickname_layout.add_widget(self.nickname_input)
+        top_section.add_widget(nickname_layout)
+        
+        # Action buttons
+        button_layout = BoxLayout(orientation='horizontal', size_hint=(1, 0.07), spacing=10)
+        
+        self.get_metadata_btn = Button(
+            text='Get All',
+            background_color=(0.2, 0.7, 0.3, 1),
+            disabled=True
+        )
+        self.get_metadata_btn.bind(on_press=self.get_all_metadata)
+        button_layout.add_widget(self.get_metadata_btn)
+        
+        self.update_metadata_btn = Button(
+            text='Update All',
+            background_color=(0.95, 0.6, 0.13, 1),
+            disabled=True
+        )
+        self.update_metadata_btn.bind(on_press=self.update_all_metadata)
+        button_layout.add_widget(self.update_metadata_btn)
+        
+        top_section.add_widget(button_layout)
+        
         main_layout.add_widget(top_section)
         
         # Debug console section
-        debug_section = BoxLayout(orientation='vertical', size_hint=(1, 0.4), spacing=5, padding=[10,0,10,10])
+        debug_section = BoxLayout(orientation='vertical', size_hint=(1, 0.3), spacing=5, padding=[10,0,10,10])
         
-        debug_header = BoxLayout(orientation='horizontal', size_hint=(1, 0.15), spacing=10)
+        debug_header = BoxLayout(orientation='horizontal', size_hint=(1, 0.2), spacing=10)
         debug_title = Label(
             text='Debug Log:',
             size_hint=(0.7, 1),
@@ -120,7 +178,7 @@ class CameraMetadataApp(App):
         debug_header.add_widget(clear_btn)
         debug_section.add_widget(debug_header)
         
-        scroll = ScrollView(size_hint=(1, 0.85))
+        scroll = ScrollView(size_hint=(1, 0.8))
         self.debug_label = Label(
             text='',
             size_hint_y=None,
@@ -137,8 +195,7 @@ class CameraMetadataApp(App):
         main_layout.add_widget(debug_section)
         
         self.log(f"App started on platform: {platform}")
-        self.log(f"Python socket module available: {socket is not None}")
-        self.log(f"SSL module available: {ssl is not None}")
+        self.log(f"Ready to connect")
         
         return main_layout
     
@@ -156,113 +213,39 @@ class CameraMetadataApp(App):
         )
         popup.open()
     
-    def test_socket(self, instance):
-        """Test raw socket connection"""
-        self.camera_ip = self.ip_input.text.strip()
-        self.log(f"=== Testing RAW SOCKET to {self.camera_ip}:443 ===")
-        
+    def https_request(self, method, path, data=None):
+        """Make HTTPS request to camera"""
         try:
-            self.log("Creating socket...")
             sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
             sock.settimeout(10)
-            
-            self.log(f"Connecting to {self.camera_ip}:443...")
             sock.connect((self.camera_ip, 443))
             
-            self.log("✓ Socket connected successfully!")
-            self.show_popup('Success', 'Raw socket connection works!')
-            
-            sock.close()
-            self.log("Socket closed")
-            
-        except socket.timeout:
-            self.log("✗ Socket timeout")
-            self.show_popup('Error', 'Socket connection timed out')
-        except socket.error as e:
-            self.log(f"✗ Socket error: {e}")
-            self.log(f"Error type: {type(e)}")
-            self.log(f"Error errno: {e.errno if hasattr(e, 'errno') else 'N/A'}")
-            self.show_popup('Error', f'Socket error: {e}')
-        except Exception as e:
-            self.log(f"✗ Exception: {type(e).__name__}: {e}")
-            self.show_popup('Error', f'Error: {e}')
-    
-    def test_ssl_socket(self, instance):
-        """Test SSL wrapped socket connection"""
-        self.camera_ip = self.ip_input.text.strip()
-        self.log(f"=== Testing SSL SOCKET to {self.camera_ip}:443 ===")
-        
-        try:
-            self.log("Creating socket...")
-            sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-            sock.settimeout(10)
-            
-            self.log(f"Connecting socket to {self.camera_ip}:443...")
-            sock.connect((self.camera_ip, 443))
-            self.log("✓ Socket connected")
-            
-            self.log("Creating SSL context...")
-            context = ssl.create_default_context()
-            context.check_hostname = False
-            context.verify_mode = ssl.CERT_NONE
-            self.log(f"SSL context: verify_mode={context.verify_mode}")
-            
-            self.log("Wrapping socket with SSL...")
-            ssl_sock = context.wrap_socket(sock, server_hostname=self.camera_ip)
-            self.log("✓ SSL handshake complete!")
-            
-            self.log(f"SSL version: {ssl_sock.version()}")
-            self.log(f"Cipher: {ssl_sock.cipher()}")
-            
-            self.show_popup('Success', 'SSL socket connection works!')
-            
-            ssl_sock.close()
-            self.log("SSL socket closed")
-            
-        except socket.timeout:
-            self.log("✗ Socket timeout")
-            self.show_popup('Error', 'Connection timed out')
-        except ssl.SSLError as e:
-            self.log(f"✗ SSL error: {e}")
-            self.show_popup('Error', f'SSL error: {e}')
-        except socket.error as e:
-            self.log(f"✗ Socket error: {e}")
-            self.log(f"Error errno: {e.errno if hasattr(e, 'errno') else 'N/A'}")
-            self.show_popup('Error', f'Socket error: {e}')
-        except Exception as e:
-            self.log(f"✗ Exception: {type(e).__name__}: {e}")
-            self.show_popup('Error', f'Error: {e}')
-    
-    def connect_camera(self, instance):
-        """Full HTTP request"""
-        self.camera_ip = self.ip_input.text.strip()
-        self.log(f"=== Full HTTPS request to {self.camera_ip}:443 ===")
-        self.status_label.text = 'Status: Connecting...'
-        self.status_label.color = (1, 1, 0, 1)
-        
-        try:
-            self.log("Creating socket...")
-            sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-            sock.settimeout(10)
-            
-            self.log("Connecting...")
-            sock.connect((self.camera_ip, 443))
-            
-            self.log("Wrapping with SSL...")
             context = ssl.create_default_context()
             context.check_hostname = False
             context.verify_mode = ssl.CERT_NONE
             ssl_sock = context.wrap_socket(sock, server_hostname=self.camera_ip)
             
-            self.log("Sending HTTP GET request...")
-            request = (
-                b"GET /ccapi/ver100/deviceinformation HTTP/1.1\r\n"
-                b"Host: " + self.camera_ip.encode() + b"\r\n"
-                b"Connection: close\r\n"
-                b"\r\n"
-            )
+            # Build request
+            if data:
+                payload = json.dumps(data)
+                request = (
+                    f"{method} {path} HTTP/1.1\r\n"
+                    f"Host: {self.camera_ip}\r\n"
+                    f"Content-Type: application/json\r\n"
+                    f"Content-Length: {len(payload)}\r\n"
+                    f"Connection: close\r\n"
+                    f"\r\n"
+                    f"{payload}"
+                ).encode()
+            else:
+                request = (
+                    f"{method} {path} HTTP/1.1\r\n"
+                    f"Host: {self.camera_ip}\r\n"
+                    f"Connection: close\r\n"
+                    f"\r\n"
+                ).encode()
+            
             ssl_sock.sendall(request)
-            self.log("Request sent, waiting for response...")
             
             response = b""
             while True:
@@ -271,37 +254,120 @@ class CameraMetadataApp(App):
                     break
                 response += chunk
             
-            self.log(f"Received {len(response)} bytes")
-            response_text = response.decode('utf-8', errors='ignore')
-            
-            # Parse response
-            lines = response_text.split('\r\n')
-            self.log(f"Status line: {lines[0]}")
-            
-            # Find JSON body
-            json_start = response_text.find('{')
-            if json_start > 0:
-                json_body = response_text[json_start:]
-                self.log(f"JSON body: {json_body[:200]}")
-                
-                if '"productname"' in json_body:
-                    self.connected = True
-                    self.status_label.text = 'Status: Connected!'
-                    self.status_label.color = (0, 1, 0, 1)
-                    self.show_popup('Success', 'Connected to camera!')
-                else:
-                    raise Exception("No productname in response")
-            else:
-                raise Exception("No JSON in response")
-            
             ssl_sock.close()
+            
+            response_text = response.decode('utf-8', errors='ignore')
+            lines = response_text.split('\r\n')
+            status_line = lines[0]
+            
+            # Extract JSON body
+            json_start = response_text.find('{')
+            json_body = None
+            if json_start > 0:
+                json_body = json.loads(response_text[json_start:])
+            
+            return status_line, json_body
+            
+        except Exception as e:
+            raise Exception(f"Request failed: {e}")
+    
+    def connect_camera(self, instance):
+        """Test connection to camera"""
+        self.camera_ip = self.ip_input.text.strip()
+        self.log(f"=== Connecting to {self.camera_ip} ===")
+        self.status_label.text = 'Status: Connecting...'
+        self.status_label.color = (1, 1, 0, 1)
+        
+        try:
+            status, data = self.https_request('GET', '/ccapi/ver100/deviceinformation')
+            
+            if '200 OK' in status and data:
+                self.connected = True
+                self.status_label.text = 'Status: Connected!'
+                self.status_label.color = (0, 1, 0, 1)
+                self.get_metadata_btn.disabled = False
+                self.update_metadata_btn.disabled = False
+                
+                product = data.get('productname', 'Unknown')
+                self.log(f"✓ Connected to {product}")
+                self.show_popup('Success', f'Connected to {product}!')
+            else:
+                raise Exception(f"Unexpected response: {status}")
             
         except Exception as e:
             self.connected = False
             self.status_label.text = 'Status: Failed'
             self.status_label.color = (1, 0, 0, 1)
-            self.log(f"✗ Error: {type(e).__name__}: {e}")
+            self.get_metadata_btn.disabled = True
+            self.update_metadata_btn.disabled = True
+            self.log(f"✗ Error: {e}")
             self.show_popup('Error', f'Connection failed: {e}')
+    
+    def get_all_metadata(self, instance):
+        """Get all metadata from camera"""
+        self.log(f"=== Getting all metadata ===")
+        
+        fields = ['author', 'copyright', 'ownername', 'nickname']
+        
+        for field in fields:
+            try:
+                status, data = self.https_request('GET', f'/ccapi/ver100/functions/registeredname/{field}')
+                
+                if '200 OK' in status and data:
+                    value = data.get(field, '')
+                    self.log(f"✓ {field}: '{value}'")
+                    
+                    if field == 'author':
+                        self.author_input.text = value
+                    elif field == 'copyright':
+                        self.copyright_input.text = value
+                    elif field == 'ownername':
+                        self.owner_input.text = value
+                    elif field == 'nickname':
+                        self.nickname_input.text = value
+                else:
+                    self.log(f"✗ Failed to get {field}: {status}")
+                    
+            except Exception as e:
+                self.log(f"✗ Error getting {field}: {e}")
+        
+        self.show_popup('Success', 'Metadata retrieved!')
+    
+    def update_all_metadata(self, instance):
+        """Update all metadata on camera"""
+        self.log(f"=== Updating metadata ===")
+        
+        fields = {
+            'author': self.author_input.text.strip(),
+            'copyright': self.copyright_input.text.strip(),
+            'ownername': self.owner_input.text.strip(),
+            'nickname': self.nickname_input.text.strip()
+        }
+        
+        updated = []
+        
+        for field, value in fields.items():
+            if value:  # Only update non-empty fields
+                try:
+                    status, data = self.https_request(
+                        'PUT',
+                        f'/ccapi/ver100/functions/registeredname/{field}',
+                        {field: value}
+                    )
+                    
+                    if '200 OK' in status:
+                        self.log(f"✓ Updated {field} to '{value}'")
+                        updated.append(field)
+                    else:
+                        self.log(f"✗ Failed to update {field}: {status}")
+                        
+                except Exception as e:
+                    self.log(f"✗ Error updating {field}: {e}")
+        
+        if updated:
+            self.show_popup('Success', f'Updated: {", ".join(updated)}')
+        else:
+            self.show_popup('Warning', 'No fields were updated')
 
 if __name__ == '__main__':
     CameraMetadataApp().run()
