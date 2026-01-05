@@ -8,7 +8,6 @@ on:
 jobs:
   build:
     runs-on: ubuntu-latest
-
     steps:
       - uses: actions/checkout@v4
 
@@ -16,20 +15,39 @@ jobs:
         run: |
           sudo apt-get update
           sudo apt-get install -y \
-            python3 python3-pip python3-venv \
+            python3 python3-venv \
             git zip unzip \
             openjdk-17-jdk \
             autoconf automake libtool pkg-config \
             zlib1g-dev libncurses5-dev libncursesw5-dev \
             cmake libffi-dev libssl-dev
 
-      - name: Install Buildozer
+      - name: Create venv and install Buildozer
         run: |
-          python3 -m pip install --upgrade pip setuptools wheel
-          python3 -m pip install "Cython==0.29.33" buildozer
+          python3 -m venv .venv
+          . .venv/bin/activate
+          python -m pip install --upgrade pip setuptools wheel
+          python -m pip install "Cython==0.29.33" buildozer
 
-      - name: Build APK
+      - name: Debug: show workspace + spec
         run: |
+          pwd
+          ls -la
+          echo "---- buildozer.spec ----"
+          sed -n '1,220p' buildozer.spec
+
+      - name: Build APK (first run to download SDK/NDK)
+        run: |
+          . .venv/bin/activate
+          buildozer -v android debug || true
+
+      - name: Accept Android SDK licenses (CI)
+        run: |
+          yes | "$HOME/.buildozer/android/platform/android-sdk/tools/bin/sdkmanager" --licenses || true
+
+      - name: Build APK (real build)
+        run: |
+          . .venv/bin/activate
           buildozer -v android debug
 
       - name: Upload APK artifact
