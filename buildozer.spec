@@ -3,15 +3,13 @@ title = Camera Metadata App
 package.name = camerametadataapp
 package.domain = org.example
 source.dir = .
-source.include_exts = py,png,jpg,jpeg,kv,atlas,json,txt,ttf,otf,wav,mp3,xml
+source.include_exts = py,png,jpg,jpeg,kv,atlas,json,txt,ttf,otf,wav,mp3
 source.main = main.py
 version = 0.1.0
-requirements = python3,kivy
+requirements = python3,kivy,android
 
 orientation = portrait
 fullscreen = 0
-
-android.manifest.application_attrs = android:usesCleartextTraffic="true",android:networkSecurityConfig="@xml/network_security_config"
 
 [buildozer]
 log_level = 2
@@ -30,6 +28,3 @@ android.permissions = INTERNET,ACCESS_NETWORK_STATE,ACCESS_WIFI_STATE,CHANGE_WIF
 android.private_storage = True
 android.enable_androidx = True
 android.release_artifact = apk
-
-# This tells Buildozer to copy the templates folder
-android.add_src = templates
