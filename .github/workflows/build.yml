@@ -88,6 +88,13 @@ jobs:
             "build-tools;34.0.0" \
             "ndk;25.2.9519653"
 
+      - name: Verify templates directory
+        run: |
+          echo "=== Project structure ==="
+          ls -la
+          echo "=== Templates directory ==="
+          ls -la templates/res/xml/ || echo "WARNING: templates directory not found"
+
       - name: Build APK
         run: |
           . .venv/bin/activate
