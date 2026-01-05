@@ -8,6 +8,7 @@ on:
 jobs:
   build:
     runs-on: ubuntu-latest
+
     steps:
       - uses: actions/checkout@v4
 
@@ -34,9 +35,9 @@ jobs:
           pwd
           ls -la
           echo "---- buildozer.spec ----"
-          sed -n '1,220p' buildozer.spec
+          sed -n '1,240p' buildozer.spec
 
-      - name: Build APK (first run to download SDK/NDK)
+      - name: Build APK
         run: |
           . .venv/bin/activate
           buildozer -v android debug || true
@@ -45,7 +46,7 @@ jobs:
         run: |
           yes | "$HOME/.buildozer/android/platform/android-sdk/tools/bin/sdkmanager" --licenses || true
 
-      - name: Build APK (real build)
+      - name: Build APK (after licenses)
         run: |
           . .venv/bin/activate
           buildozer -v android debug
