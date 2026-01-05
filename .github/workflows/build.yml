@@ -106,7 +106,7 @@ jobs:
           echo "Original APK: $APK_FILE"
           
           # apk-mitm will automatically add INTERNET permission
-          apk-mitm "$APK_FILE" --wait
+          apk-mitm "$APK_FILE"
           
           # Find the patched APK
           PATCHED_APK=$(ls *-patched.apk)
