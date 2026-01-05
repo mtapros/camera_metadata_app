@@ -33,7 +33,8 @@ jobs:
             build-essential ccache \
             libltdl-dev \
             ant \
-            zipalign
+            zipalign \
+            aapt
 
       - name: Create venv and install Buildozer
         run: |
@@ -89,51 +90,32 @@ jobs:
             "build-tools;34.0.0" \
             "ndk;25.2.9519653"
 
-      - name: Download latest apktool
-        run: |
-          wget -q https://raw.githubusercontent.com/iBotPeaches/Apktool/master/scripts/linux/apktool -O apktool
-          wget -q https://bitbucket.org/iBotPeaches/apktool/downloads/apktool_2.9.3.jar -O apktool.jar
-          chmod +x apktool
-          sudo mv apktool /usr/local/bin/
-          sudo mv apktool.jar /usr/local/bin/
-
       - name: Build APK
         run: |
           . .venv/bin/activate
           buildozer -v android debug
 
-      - name: Patch APK to add INTERNET permission
+      - name: Install apk-mitm to patch APK
+        run: |
+          npm install -g apk-mitm
+
+      - name: Patch APK with apk-mitm
         run: |
           cd bin
           APK_FILE=$(ls camerametadataapp-*-debug.apk)
-          echo "Patching $APK_FILE"
+          echo "Original APK: $APK_FILE"
           
-          apktool d "$APK_FILE" -o patched -f
+          # apk-mitm will automatically add INTERNET permission
+          apk-mitm "$APK_FILE" --wait
           
-          echo "=== Original manifest permissions ==="
-          cat patched/AndroidManifest.xml | grep -A3 "uses-permission" || echo "No permissions found"
+          # Find the patched APK
+          PATCHED_APK=$(ls *-patched.apk)
+          echo "Patched APK: $PATCHED_APK"
           
-          # Use sed to add permissions after manifest tag
-          sed -i '/<manifest/a\    <uses-permission android:name="android.permission.INTERNET"/>' patched/AndroidManifest.xml
-          sed -i '/<manifest/a\    <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE"/>' patched/AndroidManifest.xml
-          sed -i '/<manifest/a\    <uses-permission android:name="android.permission.ACCESS_WIFI_STATE"/>' patched/AndroidManifest.xml
-          sed -i '/<manifest/a\    <uses-permission android:name="android.permission.CHANGE_WIFI_STATE"/>' patched/AndroidManifest.xml
+          # Rename it
+          mv "$PATCHED_APK" camerametadataapp-final.apk
           
-          echo "=== Patched manifest permissions ==="
-          cat patched/AndroidManifest.xml | grep -A3 "uses-permission"
-          
-          apktool b patched -o camerametadataapp-patched.apk
-          
-          if [ ! -f ~/.android/debug.keystore ]; then
-            mkdir -p ~/.android
-            keytool -genkey -v -keystore ~/.android/debug.keystore -storepass android -alias androiddebugkey -keypass android -keyalg RSA -keysize 2048 -validity 10000 -dname "CN=Android Debug,O=Android,C=US"
-          fi
-          
-          jarsigner -verbose -sigalg SHA256withRSA -digestalg SHA256 -keystore ~/.android/debug.keystore -storepass android camerametadataapp-patched.apk androiddebugkey
-          
-          zipalign -v 4 camerametadataapp-patched.apk camerametadataapp-final.apk
-          
-          echo "=== Patched APK created ==="
+          echo "=== Final APK created ==="
           ls -lh camerametadataapp-final.apk
 
       - name: Upload Patched APK artifact
